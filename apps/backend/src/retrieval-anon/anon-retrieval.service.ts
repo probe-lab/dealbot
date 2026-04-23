@@ -11,7 +11,7 @@ import { WalletSdkService } from "../wallet-sdk/wallet-sdk.service.js";
 import { AnonPieceSelectorService } from "./anon-piece-selector.service.js";
 import { CarValidationService } from "./car-validation.service.js";
 import { PieceRetrievalService } from "./piece-retrieval.service.js";
-import type { CarValidationResult, PieceRetrievalResult } from "./types.js";
+import type { AnonPiece, CarValidationResult, PieceRetrievalResult } from "./types.js";
 
 @Injectable()
 export class AnonRetrievalService {
@@ -153,14 +153,7 @@ export class AnonRetrievalService {
 
   private async saveRetrievalRecord(
     spAddress: string,
-    piece: {
-      pieceCid: string;
-      dataSetId: string;
-      pieceId: string;
-      rawSize: string;
-      withIPFSIndexing: boolean;
-      ipfsRootCid: string | null;
-    },
+    piece: AnonPiece,
     pieceResult: PieceRetrievalResult,
     carResult: CarValidationResult | null,
     startedAt: Date,
