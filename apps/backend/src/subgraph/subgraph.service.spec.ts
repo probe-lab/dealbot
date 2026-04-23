@@ -163,7 +163,7 @@ describe("SubgraphService", () => {
 
       await vi.runAllTimersAsync();
 
-      await expect(promise).rejects.toThrow("Failed to fetch provider data after 3 attempts");
+      await expect(promise).rejects.toThrow("Failed to fetch subgraph providers after 3 attempts");
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
@@ -185,7 +185,7 @@ describe("SubgraphService", () => {
       await vi.runAllTimersAsync();
 
       // Now await the final promise to catch the expected error
-      await expect(promise).rejects.toThrow("Failed to fetch provider data after 3 attempts");
+      await expect(promise).rejects.toThrow("Failed to fetch subgraph providers after 3 attempts");
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
@@ -201,7 +201,7 @@ describe("SubgraphService", () => {
       await vi.runAllTimersAsync();
 
       // Now await the final promise to catch the expected error
-      await expect(promise).rejects.toThrow("Failed to fetch provider data after 3 attempts");
+      await expect(promise).rejects.toThrow("Failed to fetch subgraph providers after 3 attempts");
       expect(fetchMock).toHaveBeenCalledTimes(3); // Initial + 2 retries = 3 total
     });
 

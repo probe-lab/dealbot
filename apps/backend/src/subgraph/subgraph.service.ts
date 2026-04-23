@@ -268,96 +268,19 @@ export class SubgraphService {
   }
 
   /**
-   * Fetch with exponential backoff retry mechanism
-   * Assuming initial request to be first attempt
+   * Fetch a single batch of providers via the shared executeQuery loop.
    */
   private async fetchWithRetry(
     blockNumber: number,
     addresses: string[],
-    attempt: number = 1,
   ): Promise<ProviderDataSetResponse["providers"]> {
-    if (!this.blockchainConfig.subgraphEndpoint) {
-      throw new Error("No PDP subgraph endpoint configured");
-    }
-
-    const variables = {
-      blockNumber: blockNumber.toString(),
-      addresses,
-    };
-
-    try {
-      await this.enforceRateLimit();
-
-      const response = await fetch(this.blockchainConfig.subgraphEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: Queries.GET_PROVIDERS_WITH_DATASETS,
-          variables,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = (await response.json()) as GraphQLResponse;
-
-      if (result.errors) {
-        const errorMessage = result.errors?.[0]?.message || "Unknown GraphQL error";
-        throw new Error(`GraphQL error: ${errorMessage}`);
-      }
-
-      let validated: ProviderDataSetResponse;
-      try {
-        validated = validateProviderDataSetResponse(result.data);
-      } catch (validationError) {
-        const errorMessage = validationError instanceof Error ? validationError.message : "Unknown validation error";
-        throw new ValidationError(`Data validation failed: ${errorMessage}`);
-      }
-
-      return validated.providers;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-      // No need to retry on validation errors - they indicate schema/data issues, not transient failures
-      if (error instanceof ValidationError) {
-        this.logger.error({
-          event: "subgraph_provider_data_validation_failed",
-          message: "Subgraph data validation failed",
-          error: toStructuredError(error),
-        });
-        throw error;
-      }
-
-      // Retry on network/HTTP errors
-      if (attempt < SubgraphService.MAX_RETRIES) {
-        const delay = SubgraphService.INITIAL_RETRY_DELAY_MS * (1 << (attempt - 1));
-        this.logger.warn({
-          event: "subgraph_provider_request_retry",
-          message: "Subgraph provider request failed. Retrying...",
-          attempt,
-          maxRetries: SubgraphService.MAX_RETRIES,
-          retryDelayMs: delay,
-          addressCount: addresses.length,
-          error: toStructuredError(error),
-        });
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        return this.fetchWithRetry(blockNumber, addresses, attempt + 1);
-      }
-
-      this.logger.error({
-        event: "subgraph_provider_request_failed",
-        message: "Subgraph provider request failed after maximum retries",
-        maxRetries: SubgraphService.MAX_RETRIES,
-        blockNumber,
-        addressCount: addresses.length,
-        error: toStructuredError(error),
-      });
-      throw new Error(`Failed to fetch provider data after ${SubgraphService.MAX_RETRIES} attempts: ${errorMessage}`);
-    }
+    const validated = await this.executeQuery<ProviderDataSetResponse>(
+      "providers",
+      Queries.GET_PROVIDERS_WITH_DATASETS,
+      { blockNumber: blockNumber.toString(), addresses },
+      validateProviderDataSetResponse,
+    );
+    return validated.providers;
   }
 
   /**
