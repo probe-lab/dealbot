@@ -188,7 +188,7 @@ export class AnonRetrievalService {
       responseCode: pieceResult.statusCode > 0 ? pieceResult.statusCode : null,
       errorMessage: pieceResult.errorMessage ?? null,
       commpValid: pieceResult.success ? pieceResult.commPValid : null,
-      carValid: carResult ? carResult.ipniValid !== false && carResult.blockFetchValid !== false : null,
+      carValid: computeCarValid(carResult),
     });
 
     try {
@@ -223,6 +223,13 @@ export class AnonRetrievalService {
 
     return retrieval;
   }
+}
+
+function computeCarValid(carResult: CarValidationResult | null): boolean | null {
+  if (!carResult) return null;
+  if (!carResult.carParseable) return false;
+  if (carResult.ipniValid === null && carResult.blockFetchValid === null) return null;
+  return carResult.ipniValid !== false && carResult.blockFetchValid !== false;
 }
 
 function buildAbortedPlaceholder(pieceCid: string, reason: unknown): PieceRetrievalResult {
