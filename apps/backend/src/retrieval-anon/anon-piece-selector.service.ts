@@ -68,8 +68,7 @@ export class AnonPieceSelectorService {
    * 2. Pick a pool (`indexed` 80% / `any` 20%).
    * 3. Generate a uniform-random sampleKey and query the subgraph for the
    *    smallest `Root.sampleKey ≥ $sampleKey` matching the filters.
-   * 4. Drop the pick if `pdpPaymentEndEpoch` has passed or it was tested
-   *    recently; redraw once.
+   * 4. Drop the pick if it was tested recently; redraw once.
    * 5. If still empty, fall back through: (same bucket, opposite pool) →
    *    (any bucket, indexed) → (any bucket, any).
    */
@@ -129,7 +128,7 @@ export class AnonPieceSelectorService {
 
   /**
    * Try to draw a piece for one (bucket, pool) combination. Up to two draws
-   * with fresh sampleKeys, each filtered by dedup + epoch-termination.
+   * with fresh sampleKeys, each filtered by the dedup window.
    */
   private async drawPiece(args: {
     spAddress: string;
@@ -152,10 +151,6 @@ export class AnonPieceSelectorService {
 
       const piece = await this.subgraphService.sampleAnonPiece(params);
       if (!piece) {
-        continue;
-      }
-
-      if (piece.pdpPaymentEndEpoch != null && piece.pdpPaymentEndEpoch <= BigInt(piece.indexedAtBlock)) {
         continue;
       }
 

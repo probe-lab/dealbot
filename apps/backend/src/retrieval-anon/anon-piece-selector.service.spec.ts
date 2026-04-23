@@ -85,19 +85,6 @@ describe("AnonPieceSelectorService", () => {
     expect(call.serviceProvider).toBe(SP_ADDRESS);
   });
 
-  it("redraws when the first sampled piece's payment has already terminated", async () => {
-    const staleCid = "baga-terminated";
-    const freshCid = "baga-live";
-    sampleAnonPiece
-      .mockResolvedValueOnce(makePiece({ pieceCid: staleCid, pdpPaymentEndEpoch: 100n, indexedAtBlock: 200 }))
-      .mockResolvedValueOnce(makePiece({ pieceCid: freshCid, pdpPaymentEndEpoch: null }));
-
-    const service = new AnonPieceSelectorService(subgraphService, makeConfigService(), makeRetrievalRepository([]));
-    const result = await service.selectPieceForProvider(SP_ADDRESS);
-
-    expect(result?.pieceCid).toBe(freshCid);
-  });
-
   it("redraws when the first sampled piece was recently tested", async () => {
     const staleCid = "baga-stale";
     const freshCid = "baga-fresh";
