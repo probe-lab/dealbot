@@ -71,85 +71,11 @@ export class SubgraphService {
   /**
    * Fetch subgraph metadata including the latest indexed block number
    *
-   * @param attempt - Current retry attempt number (default: 1)
    * @returns Subgraph metadata with block number
    * @throws Error if endpoint is not configured or after MAX_RETRIES attempts
    */
-  async fetchSubgraphMeta(attempt: number = 1): Promise<SubgraphMeta> {
-    if (!this.blockchainConfig.subgraphEndpoint) {
-      throw new Error("No PDP subgraph endpoint configured");
-    }
-
-    try {
-      await this.enforceRateLimit();
-
-      const response = await fetch(this.blockchainConfig.subgraphEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: Queries.GET_SUBGRAPH_META,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = (await response.json()) as GraphQLResponse;
-
-      if (result.errors) {
-        const errorMessage = result.errors?.[0]?.message || "Unknown GraphQL error";
-        throw new Error(`GraphQL error: ${errorMessage}`);
-      }
-      let validated: SubgraphMeta;
-      try {
-        validated = validateSubgraphMetaResponse(result.data);
-      } catch (validationError) {
-        const errorMessage = validationError instanceof Error ? validationError.message : "Unknown validation error";
-        throw new ValidationError(`Data validation failed: ${errorMessage}`);
-      }
-
-      return validated;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-      // No need to retry on validation errors - they indicate schema/data issues, not transient failures
-      if (error instanceof ValidationError) {
-        this.logger.error({
-          event: "subgraph_meta_validation_failed",
-          message: "Subgraph data validation failed",
-          error: toStructuredError(error),
-        });
-        throw error;
-      }
-
-      // Retry on network/HTTP errors
-      if (attempt < SubgraphService.MAX_RETRIES) {
-        const delay = SubgraphService.INITIAL_RETRY_DELAY_MS * (1 << (attempt - 1));
-        this.logger.warn({
-          event: "subgraph_meta_request_retry",
-          message: "Subgraph meta request failed. Retrying...",
-          attempt,
-          maxRetries: SubgraphService.MAX_RETRIES,
-          retryDelayMs: delay,
-          error: toStructuredError(error),
-        });
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        return this.fetchSubgraphMeta(attempt + 1);
-      }
-
-      this.logger.error({
-        event: "subgraph_meta_request_failed",
-        message: "Subgraph meta request failed after maximum retries",
-        maxRetries: SubgraphService.MAX_RETRIES,
-        error: toStructuredError(error),
-      });
-      throw new Error(
-        `Failed to fetch subgraph metadata after ${SubgraphService.MAX_RETRIES} attempts: ${errorMessage}`,
-      );
-    }
+  async fetchSubgraphMeta(): Promise<SubgraphMeta> {
+    return this.executeQuery("meta", Queries.GET_SUBGRAPH_META, {}, validateSubgraphMetaResponse);
   }
 
   /**

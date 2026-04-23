@@ -420,7 +420,7 @@ describe("SubgraphService", () => {
       await vi.runAllTimersAsync();
 
       // Now await the final promise to catch the expected error
-      await expect(promise).rejects.toThrow("Failed to fetch subgraph metadata after 3 attempts");
+      await expect(promise).rejects.toThrow("Failed to fetch subgraph meta after 3 attempts");
     });
 
     it("throws on GraphQL errors in response", async () => {
@@ -437,7 +437,7 @@ describe("SubgraphService", () => {
       await vi.runAllTimersAsync();
 
       // Now await the final promise to catch the expected error
-      await expect(promise).rejects.toThrow("Failed to fetch subgraph metadata after 3 attempts");
+      await expect(promise).rejects.toThrow("Failed to fetch subgraph meta after 3 attempts");
     });
 
     it("throws on validation failure without retry", async () => {
@@ -502,7 +502,7 @@ describe("SubgraphService", () => {
       await vi.runAllTimersAsync();
 
       // Now await the final promise to catch the expected error
-      await expect(promise).rejects.toThrow("Failed to fetch subgraph metadata after 3 attempts");
+      await expect(promise).rejects.toThrow("Failed to fetch subgraph meta after 3 attempts");
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
   });
