@@ -85,6 +85,33 @@ describe("AnonPieceSelectorService", () => {
     expect(call.serviceProvider).toBe(SP_ADDRESS);
   });
 
+  it("advances to the next fallback when both draws for a (bucket, pool) hit the dedup window", async () => {
+    const stale1 = "baga-stale-1";
+    const stale2 = "baga-stale-2";
+    const fresh = "baga-fresh";
+    sampleAnonPiece
+      // Primary (bucket, pool): both draws return recently-tested pieces.
+      .mockResolvedValueOnce(makePiece({ pieceCid: stale1 }))
+      .mockResolvedValueOnce(makePiece({ pieceCid: stale2 }))
+      // Fallback (bucket, opposite pool): first draw returns a fresh piece.
+      .mockResolvedValueOnce(makePiece({ pieceCid: fresh }));
+
+    const service = new AnonPieceSelectorService(
+      subgraphService,
+      makeConfigService(),
+      makeRetrievalRepository([stale1, stale2]),
+    );
+    const result = await service.selectPieceForProvider(SP_ADDRESS);
+
+    expect(result?.pieceCid).toBe(fresh);
+    // Exactly three calls: two deduped draws for the primary combo, one
+    // successful draw for the fallback combo.
+    expect(sampleAnonPiece).toHaveBeenCalledTimes(3);
+    const primaryPool = (sampleAnonPiece.mock.calls[0][0] as SampleAnonPieceParams).pool;
+    const fallbackPool = (sampleAnonPiece.mock.calls[2][0] as SampleAnonPieceParams).pool;
+    expect(fallbackPool).not.toBe(primaryPool);
+  });
+
   it("redraws when the first sampled piece was recently tested", async () => {
     const staleCid = "baga-stale";
     const freshCid = "baga-fresh";
