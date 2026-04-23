@@ -80,7 +80,12 @@ export const configValidationSchema = Joi.object({
   DEALS_PER_SP_PER_HOUR: Joi.number().min(0.001).max(20).default(4),
   DATASET_CREATIONS_PER_SP_PER_HOUR: Joi.number().min(0.001).max(20).default(1),
   RETRIEVALS_PER_SP_PER_HOUR: Joi.number().min(0.001).max(20).default(2),
-  RETRIEVALS_ANON_PER_SP_PER_HOUR: Joi.number().min(0.001).max(20).optional(),
+  // Defaults to RETRIEVALS_PER_SP_PER_HOUR when unset; loadConfig mirrors the
+  // same fallback so the schema-validated and runtime values agree.
+  RETRIEVALS_ANON_PER_SP_PER_HOUR: Joi.number()
+    .min(0.001)
+    .max(20)
+    .default(Joi.ref("RETRIEVALS_PER_SP_PER_HOUR")),
   // Polling interval for pg-boss scheduler (lower = more responsive, higher = less DB chatter).
   JOB_SCHEDULER_POLL_SECONDS: Joi.number().min(60).default(300),
   JOB_WORKER_POLL_SECONDS: Joi.number().min(5).default(60),
