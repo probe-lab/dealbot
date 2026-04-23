@@ -154,6 +154,10 @@ export class CarValidationService {
       return { valid: null, errorMessage: `Provider info not found for ${spAddress}` };
     }
 
+    if (sampledBlocks.length === 0) {
+      return { valid: null };
+    }
+
     const spBaseUrl = providerInfo.pdp.serviceURL.replace(/\/$/, "");
     let allValid = true;
 
