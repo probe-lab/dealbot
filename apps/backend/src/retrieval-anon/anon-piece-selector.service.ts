@@ -139,11 +139,16 @@ export class AnonPieceSelectorService {
   }): Promise<AnonCandidatePiece | null> {
     const range = args.bucket === "any" ? fullRange() : SIZE_BUCKETS[args.bucket];
 
-    for (let attempt = 0; attempt < 2; attempt++) {
+    // First draw uses a fresh random key; the second wraps around from 0x00
+    // so that if any row exists in the (bucket, pool) the second query is
+    // guaranteed to find it (vs. leaving an unsampled tail when the first
+    // key lands above the largest existing sampleKey).
+    const sampleKeys = [randomSampleKey(), WRAP_AROUND_SAMPLE_KEY];
+    for (const sampleKey of sampleKeys) {
       const params: SampleAnonPieceParams = {
         serviceProvider: args.spAddress,
         payer: args.dealbotPayer,
-        sampleKey: randomSampleKey(),
+        sampleKey,
         minSize: range.min.toString(),
         maxSize: range.max.toString(),
         pool: args.pool,
@@ -196,6 +201,9 @@ export class AnonPieceSelectorService {
 function randomSampleKey(): string {
   return `0x${randomBytes(32).toString("hex")}`;
 }
+
+/** Smallest possible 32-byte sort key (used for wrap-around redraws). */
+const WRAP_AROUND_SAMPLE_KEY = `0x${"0".repeat(64)}`;
 
 /** The full size range (used when bucket fallback is "any"). */
 function fullRange(): SizeRange {
