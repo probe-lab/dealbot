@@ -990,7 +990,7 @@ RANDOM_PIECE_SIZES=1024,10240,102400
 
 - **Type**: `number` (milliseconds)
 - **Required**: No
-- **Default**: `240000` (4 minutes)
+- **Default**: derived at boot — the largest of the job timeouts (`DEAL_JOB_TIMEOUT_SECONDS`, `RETRIEVAL_JOB_TIMEOUT_SECONDS`, `ANON_RETRIEVAL_JOB_TIMEOUT_SECONDS`, `DATA_SET_CREATION_JOB_TIMEOUT_SECONDS`, `MAX_PIECE_CLEANUP_RUNTIME_SECONDS`), in milliseconds
 - **Minimum**: `1000`
 
 **Role**: Maximum total time for HTTP/1.1 requests, including body transfer.
@@ -1000,13 +1000,15 @@ RANDOM_PIECE_SIZES=1024,10240,102400
 - Increase for large file retrievals
 - Decrease to fail faster on slow providers
 
+**Note**: Setting this below the longest job timeout causes the HTTP-level timer to abort in-flight work before the job-level `AbortSignal` fires. `loadConfig` warns at boot when this happens.
+
 ---
 
 ### `HTTP2_REQUEST_TIMEOUT_MS`
 
 - **Type**: `number` (milliseconds)
 - **Required**: No
-- **Default**: `240000` (4 minutes)
+- **Default**: derived at boot — the largest of the job timeouts (see `HTTP_REQUEST_TIMEOUT_MS`), in milliseconds
 - **Minimum**: `1000`
 
 **Role**: Maximum total time for HTTP/2 requests, including body transfer.
