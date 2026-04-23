@@ -250,8 +250,7 @@ export class SubgraphService {
   ): Promise<ProviderDataSetResponse["providers"]> {
     const batches: string[][] = [];
     for (let i = 0; i < addresses.length; i += SubgraphService.MAX_PROVIDERS_PER_QUERY) {
-      const addressesLimit = Math.min(addresses.length, i + SubgraphService.MAX_PROVIDERS_PER_QUERY);
-      batches.push(addresses.slice(i, addressesLimit));
+      batches.push(addresses.slice(i, i + SubgraphService.MAX_PROVIDERS_PER_QUERY));
     }
 
     const allProviders: ProviderDataSetResponse["providers"] = [];
