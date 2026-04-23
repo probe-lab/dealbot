@@ -142,11 +142,13 @@ export class HttpClientService {
       };
 
       if (downloadError !== undefined) {
-        const aborted = options.signal?.aborted === true || isAbortLikeError(downloadError);
+        const aborted =
+          options.signal?.aborted === true || transferTimeoutSignal.aborted || isAbortLikeError(downloadError);
         if (!aborted) {
           throw downloadError;
         }
-        const abortReason = describeAbortReason(options.signal, downloadError);
+        const abortSource = options.signal?.aborted === true ? options.signal : transferTimeoutSignal;
+        const abortReason = describeAbortReason(abortSource, downloadError);
         this.logger.warn({
           event: "http2_download_aborted",
           message: "HTTP/2 download aborted after headers; returning partial data",
