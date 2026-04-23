@@ -117,7 +117,9 @@ export class AnonRetrievalService {
         }
       }
 
-      // Emit CAR validation metrics
+      // Emit CAR validation metrics. When carResult is absent the checks
+      // were skipped — either because the piece retrieval failed, the piece
+      // isn't IPFS-indexed, or the validator threw (already logged above).
       if (carResult) {
         this.metrics.recordCarParseStatus(labels, carResult.carParseable);
         this.metrics.recordIpniStatus(
@@ -128,8 +130,7 @@ export class AnonRetrievalService {
           labels,
           carResult.blockFetchValid === null ? "skipped" : carResult.blockFetchValid ? "valid" : "invalid",
         );
-      } else if (!pieceResult.success) {
-        // Piece retrieval failed — IPNI and block fetch were skipped
+      } else {
         this.metrics.recordIpniStatus(labels, "skipped");
         this.metrics.recordBlockFetchStatus(labels, "skipped");
       }
