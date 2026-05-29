@@ -131,9 +131,11 @@ export class SubgraphService {
    * range, and optionally `withIPFSIndexing`. Returns null only when no
    * piece in either direction matches the filters.
    *
-   * `pdpPaymentEndEpoch` is returned to the caller for a cheap client-side
-   * epoch comparison — GraphQL filters on nullable BigInts are awkward.
-   * However this will be changed in the context of https://github.com/FilOzone/dealbot/issues/579.
+   * Server-side filtering includes `proofSet.isPaymentActive: true`, so
+   * the caller no longer needs a client-side epoch comparison. Every returned
+   * piece belongs to a dataset whose PDP payment is still flowing. The
+   * `pdpPaymentEndEpoch` field on the returned candidate is retained for
+   * informational use only.
    */
   async sampleAnonPiece(params: SampleAnonPieceParams, signal?: AbortSignal): Promise<AnonCandidatePiece | null> {
     if (!this.blockchainConfig.subgraphEndpoint) {

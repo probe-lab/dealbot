@@ -31,6 +31,10 @@ export const Queries = {
  * (`_lt` + desc — largest key below the target). Filter direction and
  * sort direction move together so both modes return the piece closest
  * to the target sampleKey.
+ *
+ * The `isPaymentActive: true` clause on the proofSet filter is the server-side
+ * guarantee that the returned piece's PDP payment has not terminated, so the
+ * caller does not need to redraw on a client-side epoch comparison.
  */
 export function buildSampleAnonPieceQuery(pool: "indexed" | "any", reverse: boolean = false): string {
   const indexingFilter = pool === "indexed" ? "withIPFSIndexing: true" : "";
@@ -62,6 +66,7 @@ export function buildSampleAnonPieceQuery(pool: "indexed" | "any", reverse: bool
             fwssServiceProvider: $serviceProvider
             fwssPayer_not: $payer
             isActive: true
+            isPaymentActive: true
             ${indexingFilter}
           }
         }

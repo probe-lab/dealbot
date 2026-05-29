@@ -124,15 +124,11 @@ export class AnonPieceSelectorService {
   }
 
   /**
-   * Try to draw a piece for one (bucket, pool) combination. Up to two
-   * draws with fresh sampleKeys so we can retry past a piece whose
-   * `pdpPaymentEndEpoch` has already terminated. Boundary handling
-   * (random key above all matching sampleKeys) lives inside
-   * `sampleAnonPiece`, so the retry here is solely for epoch-termination.
-   *
-   * Change this logic when https://github.com/FilOzone/dealbot/issues/579 has
-   * landed. Then we don't need to retry because sampleAnonPiece can directly
-   * query for pieces that have not already terminated.
+   * Draw a piece for one (bucket, pool) combination. A single subgraph call
+   * is sufficient because the subgraph filters on `proofSet.isPaymentActive`,
+   * so every returned candidate has live PDP payment. The forward/reverse
+   * wrap-around fallback for the random sampleKey lives inside
+   * `sampleAnonPiece` itself, so this one call already covers boundary cases.
    */
   private async drawPiece(args: {
     spAddress: string;
@@ -141,37 +137,19 @@ export class AnonPieceSelectorService {
     pool: AnonPiecePool;
     signal?: AbortSignal;
   }): Promise<AnonCandidatePiece | null> {
-    const range = args.bucket === "any" ? fullRange() : SIZE_BUCKETS[args.bucket];
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (args.signal?.aborted) {
-        return null;
-      }
-      const params: SampleAnonPieceParams = {
-        serviceProvider: args.spAddress,
-        payer: args.dealbotPayer,
-        sampleKey: randomSampleKey(),
-        minSize: range.min.toString(),
-        maxSize: range.max.toString(),
-        pool: args.pool,
-      };
-
-      const piece = await this.subgraphService.sampleAnonPiece(params, args.signal);
-      if (!piece) {
-        continue;
-      }
-
-      // On Filecoin FEVM the EVM block number IS the chain epoch (one block per
-      // epoch), so the subgraph's indexedAtBlock is a safe proxy for "now" when
-      // checking if PDP payment for this piece has already terminated.
-      if (piece.pdpPaymentEndEpoch != null && piece.pdpPaymentEndEpoch <= BigInt(piece.indexedAtBlock)) {
-        continue;
-      }
-
-      return piece;
+    if (args.signal?.aborted) {
+      return null;
     }
-
-    return null;
+    const range = args.bucket === "any" ? fullRange() : SIZE_BUCKETS[args.bucket];
+    const params: SampleAnonPieceParams = {
+      serviceProvider: args.spAddress,
+      payer: args.dealbotPayer,
+      sampleKey: randomSampleKey(),
+      minSize: range.min.toString(),
+      maxSize: range.max.toString(),
+      pool: args.pool,
+    };
+    return this.subgraphService.sampleAnonPiece(params, args.signal);
   }
 
   private pickBucket(): SizeBucket {

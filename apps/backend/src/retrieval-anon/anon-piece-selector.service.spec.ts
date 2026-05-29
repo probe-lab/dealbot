@@ -84,57 +84,36 @@ describe("AnonPieceSelectorService", () => {
     expect(call.serviceProvider).toBe(SP_ADDRESS);
   });
 
-  it("redraws when the first sampled piece's payment has already terminated", async () => {
-    const staleCid = "baga-terminated";
-    const freshCid = "baga-live";
-    sampleAnonPiece
-      .mockResolvedValueOnce(makePiece({ pieceCid: staleCid, pdpPaymentEndEpoch: 100n, indexedAtBlock: 200 }))
-      .mockResolvedValueOnce(makePiece({ pieceCid: freshCid, pdpPaymentEndEpoch: null }));
-
+  it("calls sampleAnonPiece exactly once when the primary (bucket, pool) draw succeeds", async () => {
+    sampleAnonPiece.mockResolvedValueOnce(makePiece({ pieceCid: "baga-one-shot" }));
     const service = new AnonPieceSelectorService(subgraphService, makeConfigService());
+
     const result = await service.selectPieceForProvider(SP_ADDRESS);
 
-    expect(result?.pieceCid).toBe(freshCid);
-  });
-
-  it("treats payment-end exactly equal to current epoch as terminated (boundary)", async () => {
-    // pdpPaymentEndEpoch === indexedAtBlock should be rejected (<=, not <).
-    // This guards against an off-by-one regression where pieces in the final
-    // payment epoch silently slip through.
-    const boundaryCid = "baga-boundary";
-    const liveCid = "baga-still-live";
-    sampleAnonPiece
-      .mockResolvedValueOnce(makePiece({ pieceCid: boundaryCid, pdpPaymentEndEpoch: 200n, indexedAtBlock: 200 }))
-      .mockResolvedValueOnce(makePiece({ pieceCid: liveCid, pdpPaymentEndEpoch: 201n, indexedAtBlock: 200 }));
-
-    const service = new AnonPieceSelectorService(subgraphService, makeConfigService());
-    const result = await service.selectPieceForProvider(SP_ADDRESS);
-
-    expect(result?.pieceCid).toBe(liveCid);
+    expect(result?.pieceCid).toBe("baga-one-shot");
+    expect(sampleAnonPiece).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to the opposite pool when the preferred one is empty", async () => {
-    // First pool call returns nothing twice (both attempts), second pool succeeds.
+    // Each (bucket, pool) is a single draw now; first call empty, second
+    // call (opposite pool) succeeds.
     const fresh = makePiece({ pieceCid: "baga-other-pool" });
-    sampleAnonPiece.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(fresh);
+    sampleAnonPiece.mockResolvedValueOnce(null).mockResolvedValueOnce(fresh);
 
     const service = new AnonPieceSelectorService(subgraphService, makeConfigService());
     const result = await service.selectPieceForProvider(SP_ADDRESS);
 
     expect(result?.pieceCid).toBe("baga-other-pool");
 
-    // The second (fallback) call should target the opposite pool.
     const firstCall = sampleAnonPiece.mock.calls[0][0] as SampleAnonPieceParams;
-    const fallbackCall = sampleAnonPiece.mock.calls[2][0] as SampleAnonPieceParams;
+    const fallbackCall = sampleAnonPiece.mock.calls[1][0] as SampleAnonPieceParams;
     expect(fallbackCall.pool).not.toBe(firstCall.pool);
   });
 
   it("widens size bucket to 'any' after both pools fail in the primary bucket", async () => {
-    // 4 empty attempts across (bucket × both pools × 2 draws each) then
-    // succeed on the first `any` bucket call.
+    // 2 empty attempts (preferred + opposite pool, same bucket), then succeed
+    // on the first 'any' bucket call.
     sampleAnonPiece
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(makePiece({ pieceCid: "baga-any-bucket" }));
@@ -144,9 +123,9 @@ describe("AnonPieceSelectorService", () => {
 
     expect(result?.pieceCid).toBe("baga-any-bucket");
 
-    // The 5th call (index 4) should be the widened-bucket attempt; its size
+    // The 3rd call (index 2) should be the widened-bucket attempt; its size
     // range covers at least the 32 GiB ceiling of the "large" bucket.
-    const widened = sampleAnonPiece.mock.calls[4][0] as SampleAnonPieceParams;
+    const widened = sampleAnonPiece.mock.calls[2][0] as SampleAnonPieceParams;
     expect(BigInt(widened.maxSize)).toBeGreaterThanOrEqual(32n * 1024n * 1024n * 1024n);
     expect(widened.minSize).toBe("0");
   });

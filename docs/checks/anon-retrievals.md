@@ -42,8 +42,7 @@ Selection strategy (per scheduled job, per SP):
    - `indexed` (IPFS-indexed pieces) — 80%
    - `any` (all FWSS pieces) — 20%
 3. **Generate a uniform-random `sampleKey`** and query the subgraph for the smallest `Root.sampleKey ≥ $sampleKey` matching the SP, payer, size range, and pool filters. If no such row exists (the random key fell above every matching `sampleKey`), `sampleAnonPiece` retries in the reverse direction (largest `sampleKey < $sampleKey`) so the highest keys are not a dead zone.
-4. **Drop the candidate** if `pdpPaymentEndEpoch` has passed.
-5. **Fall back** through: (same bucket, opposite pool) → (any bucket, indexed) → (any bucket, any).
+4. **Fall back** through: (same bucket, opposite pool) → (any bucket, indexed) → (any bucket, any).
 
 The 80/20 split for `indexed` vs `any` exists so that SPs cannot optimize only their CAR corpus and still appear healthy on this check.
 
