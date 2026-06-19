@@ -6,7 +6,7 @@ import { ClickhouseService } from "../clickhouse/clickhouse.service.js";
 import { type ProviderJobContext, toStructuredError } from "../common/logging.js";
 import { StorageProvider } from "../database/entities/storage-provider.entity.js";
 import { BlockFetchStatus, CarParseStatus, IpniCheckStatus, RetrievalStatus, ServiceType } from "../database/types.js";
-import { buildCheckMetricLabels } from "../metrics-prometheus/check-metric-labels.js";
+import { buildCheckMetricLabels, type CheckMetricLabels } from "../metrics-prometheus/check-metric-labels.js";
 import { AnonRetrievalCheckMetrics } from "../metrics-prometheus/check-metrics.service.js";
 import { WalletSdkService } from "../wallet-sdk/wallet-sdk.service.js";
 import { AnonPieceSelectorService } from "./anon-piece-selector.service.js";
@@ -44,7 +44,16 @@ export class AnonRetrievalService {
     // 1. Select an anonymous piece
     const piece = await this.anonPieceSelectorService.selectPieceForProvider(spAddress, signal);
     if (!piece) {
-      throw new Error(`No anonymous piece found for SP ${spAddress}`);
+      // selectPieceForProvider returns null for BOTH an empty candidate pool
+      // (normal for an SP with a small or young corpus) and an aborted signal.
+      // Preserve abort semantics — the job handler maps an aborted signal to
+      // "aborted", not a failure — so only the genuine empty-pool case becomes
+      // a recorded SKIPPED check instead of throwing and failing the job.
+      if (signal?.aborted) {
+        throw new Error(`Anon retrieval aborted during piece selection for SP ${spAddress}`);
+      }
+      this.recordSkippedCheck(spAddress, provider, labels, logContext);
+      return;
     }
 
     this.logger.log({
@@ -201,6 +210,82 @@ export class AnonRetrievalService {
         blockFetchStatus,
       });
     }
+  }
+
+  /**
+   * Record a SKIPPED check when piece selection found no candidate after all
+   * fallbacks (a normal outcome for an SP with a small or young corpus). This
+   * is persisted as check data — not a thrown error — so the empty-pool case
+   * isn't counted as a job failure. No HTTP / CAR / IPNI / block-fetch work
+   * ran, so only the overall piece-retrieval status metric is emitted and every
+   * dimension on the row is SKIPPED. The piece-identity columns are non-nullable
+   * but there is no piece, so they carry sentinel values ("" / 0); skipped rows
+   * are identified by piece_fetch_status='skipped'. See anon-retrievals.md.
+   */
+  private recordSkippedCheck(
+    spAddress: string,
+    provider: StorageProvider | null,
+    labels: CheckMetricLabels,
+    logContext?: ProviderJobContext,
+  ): void {
+    const startedAt = new Date();
+    const retrievalId = randomUUID();
+    const errorMessage = "No anonymous piece found after all selection fallbacks";
+
+    this.metrics.recordPieceRetrievalStatus(labels, "skipped");
+
+    try {
+      this.clickhouseService.insert(ANON_RETRIEVAL_CHECKS_TABLE, {
+        timestamp: startedAt.getTime(),
+        probe_location: this.clickhouseService.probeLocation,
+        sp_address: spAddress,
+        sp_id: provider?.providerId != null ? Number(provider.providerId) : null,
+        sp_name: provider?.name ?? null,
+        retrieval_id: retrievalId,
+        piece_cid: "",
+        data_set_id: 0,
+        piece_id: 0,
+        raw_size: 0,
+        with_ipfs_indexing: false,
+        ipfs_root_cid: null,
+        service_type: ServiceType.DIRECT_SP,
+        retrieval_endpoint: "",
+        piece_fetch_status: RetrievalStatus.SKIPPED,
+        http_response_code: null,
+        first_byte_ms: null,
+        last_byte_ms: null,
+        bytes_retrieved: null,
+        throughput_bps: null,
+        commp_valid: null,
+        car_status: CarParseStatus.SKIPPED,
+        car_block_count: null,
+        block_fetch_endpoint: null,
+        block_fetch_status: BlockFetchStatus.SKIPPED,
+        block_fetch_sampled_count: null,
+        block_fetch_failed_count: null,
+        ipni_status: IpniCheckStatus.SKIPPED,
+        ipni_verify_ms: null,
+        error_message: errorMessage,
+      });
+    } catch (error) {
+      // ClickhouseService.insert is buffered/non-throwing in normal operation, but
+      // guard against unexpected runtime errors so we don't break the probe cycle.
+      this.logger.warn({
+        ...logContext,
+        event: "anon_retrieval_clickhouse_insert_failed",
+        message: "Failed to enqueue skipped anonymous retrieval row to ClickHouse",
+        spAddress,
+        error: toStructuredError(error),
+      });
+    }
+
+    this.logger.log({
+      ...logContext,
+      event: "anon_retrieval_skipped",
+      message: "No anonymous piece to test; recorded skipped check",
+      retrievalId,
+      spAddress,
+    });
   }
 }
 
